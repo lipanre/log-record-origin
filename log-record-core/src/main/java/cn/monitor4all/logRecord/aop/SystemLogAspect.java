@@ -19,6 +19,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.DefaultParameterNameDiscoverer;
+import org.springframework.core.annotation.AnnotatedElementUtils;
 import org.springframework.expression.Expression;
 import org.springframework.expression.spel.standard.SpelExpressionParser;
 import org.springframework.expression.spel.support.StandardEvaluationContext;
@@ -26,12 +27,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StopWatch;
 
 import java.lang.reflect.Method;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Consumer;
 
 @Aspect
@@ -57,19 +53,13 @@ public class SystemLogAspect {
     @Around("@annotation(cn.monitor4all.logRecord.annotation.OperationLog) || @annotation(cn.monitor4all.logRecord.annotation.OperationLogs)")
     public Object doAround(ProceedingJoinPoint pjp) throws Throwable {
         Object result;
-        OperationLog[] annotations;
         List<LogDTO> logDTOList = new ArrayList<>();
         Map<OperationLog, LogDTO> logDtoMap = new LinkedHashMap<>();
         StopWatch stopWatch = null;
         Long executionTime = null;
 
-        // 注解解析：若解析失败直接不执行日志切面逻辑
-        try {
-            Method method = getMethod(pjp);
-            annotations = method.getAnnotationsByType(OperationLog.class);
-        } catch (Throwable throwable) {
-            return pjp.proceed();
-        }
+        // 获取方法上的所有OperationLog注解
+        Collection<OperationLog> annotations = AnnotatedElementUtils.getMergedRepeatableAnnotations(getMethod(pjp), OperationLog.class);
 
         // 日志切面逻辑
         try {
@@ -298,15 +288,6 @@ public class SystemLogAspect {
     }
 
     private Method getMethod(JoinPoint joinPoint) {
-        Method method = null;
-        try {
-            Signature signature = joinPoint.getSignature();
-            MethodSignature ms = (MethodSignature) signature;
-            Object target = joinPoint.getTarget();
-            method = target.getClass().getMethod(ms.getName(), ms.getParameterTypes());
-        } catch (NoSuchMethodException e) {
-            log.error("OperationLogAspect getMethod error", e);
-        }
-        return method;
+        return ((MethodSignature) joinPoint.getSignature()).getMethod();
     }
 }
